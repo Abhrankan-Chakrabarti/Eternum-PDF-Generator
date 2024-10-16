@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create PDF</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+    <button id="generate-pdf">Generate PDF</button>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        async function fetchTextFile(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch text file: ${response.statusText}`);
+            }
+            return response.text();
+        }
+
+        async function fetchJsonFile(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch JSON file: ${response.statusText}`);
+            }
+            return response.json();
+        }
+
+        async function fetchImage(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch image: ${response.statusText}`);
+            }
+            const blob = await response.blob();
+            return URL.createObjectURL(blob); // Convert to Object URL
+        }
+
+        function text(line, str, x, y, opt, doc, chr, dim) {
+            if (chr > 99) chr = 0;
+            const lines = line % 80;
+            let newPage = false;
+            
+            if (line && lines === 0 && chr === 0 && !newPage) {
+                doc.addPage("p", "pt", dim);
+                newPage = true;
+            } else if (lines) {
+                newPage = false;
+            }
+            doc.text('\n'.repeat(lines) + ' '.repeat(chr) + str, x, y, opt);
+            return chr + str.length;
+        }
+
+        // Function to add footers to all pages
+        function addFooters(doc) {
+            const pageCount = doc.getNumberOfPages();
+            doc.setFontSize(15); // Larger font size for clarity
+
+            for (let i = 2; i <= pageCount; i++) {
+                doc.setPage(i);
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const x = pageWidth / 2;  // Center the text horizontally
+                const y = pageHeight - 20; // 20 units from the bottom
+                doc.text(`Page ${i} of ${pageCount}`, x, y, { align: 'center' });
+            }
+        }
+
+        async function createPdf(chapters, coverImage) {
+            const jspdf = new jsPDF("p", "pt", [904, 1280]); // Set page size
+            
+            // Load the cover image once
+            const coverImageUrlBlob = await fetchImage(coverImage);
+            const img = new Image();
+            img.src = coverImageUrlBlob;
+
+            img.onload = async function () {
+                const dim = [img.width, img.height];
+                
+                for (let chapter of chapters) {
+                    try {
+                        const textData = await fetchTextFile(chapter.text);
+                        const metadata = await fetchJsonFile(chapter.metadata);
+                        const colorConfig = await fetchJsonFile('./Eternum/Eternum.json'); // Common JSON for color config
+                        
+                        // Add cover image for each chapter
+                        jspdf.addImage(img, 'PNG', 1, 2, dim[0], dim[1]);
+                        jspdf.addPage("p", "pt", [904, 1280]); // Add a new page for text
+                        jspdf.setFont("Courier");
+                        jspdf.setFontSize(13);
+                        const margin = { top: 30, right: 30, bottom: 30, left: 30 };
+                        const layout = { align: "left", maxWidth: 900 };
+                        let line = 0, chr = 0;
+
+                        for (let i = 0; i < textData.length; i += 100, line++) {
+                            const lineno = line.toString();
+                            if (lineno in metadata) {
+                                const [u, n] = metadata[lineno];
+                                const color = colorConfig[u];
+                                jspdf.setTextColor(color !== '#FFFFFF' ? color : '#CCCCCC');
+                                chr = text(line, textData.slice(i, i + n), margin.left, margin.top, layout, jspdf, chr, dim);
+                                jspdf.setTextColor(0, 0, 0);
+                                chr = text(line, textData.slice(i + n, i + 100), margin.left, margin.top, layout, jspdf, chr, dim);
+                            } else {
+                                chr = text(line, textData.slice(i, i + 100), margin.left, margin.top, layout, jspdf, chr, dim);
+                            }
+                        }
+                        addFooters(jspdf);
+                        
+                        // Save the PDF after the last chapter is processed
+                        if (chapter === chapters[chapters.length - 1]) {
+                            jspdf.save('output.pdf'); // Save the final PDF
+                        }
+                    } catch (error) {
+                        console.error('Error creating PDF:', error);
+                    }
+                }
+            };
+        }
+
+        // Event listener for the button
+        document.getElementById('generate-pdf').addEventListener('click', function() {
+            const chapters = [
+                {
+                    text: '/chapter1.txt',
+                    metadata: '/chapter1_metadata.json',
+                },
+                {
+                    text: '/chapter2.txt',
+                    metadata: '/chapter2_metadata.json',
+                },
+                {
+                    text: '/chapter3.txt',
+                    metadata: '/chapter3_metadata.json',
+                },
+                {
+                    text: '/chapter4.txt',
+                    metadata: '/chapter4_metadata.json',
+                },
+                {
+                    text: '/chapter5.txt',
+                    metadata: '/chapter5_metadata.json',
+                },
+                {
+                    text: '/chapter6.txt',
+                    metadata: '/chapter6_metadata.json',
+                },
+                {
+                    text: '/chapter7.txt',
+                    metadata: '/chapter7_metadata.json',
+                }
+            ];
+
+            const coverImage = '/cover_image.png';
+            createPdf(chapters, coverImage);
+        });
+    </script>
+</body>
+</html>
