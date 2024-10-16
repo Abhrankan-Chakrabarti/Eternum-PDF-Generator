@@ -11,6 +11,17 @@
             font-size: 16px;
             cursor: pointer;
         }
+        #status {
+            margin-top: 20px;
+            font-size: 16px;
+            color: blue;
+        }
+        #download-link {
+            margin-top: 20px;
+            display: block;
+            font-size: 16px;
+            color: green;
+        }
     </style>
 </head>
 <body>
@@ -27,11 +38,11 @@
         <button onclick="generatePDF(7)">Chapter 7</button>
     </div>
     <p id="status"></p>
+    <a id="download-link"></a>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         const coverImagePath = 'cover_image.png';
 
-        // Chapter text and metadata fetch
         const chapters = [
             { textFile: 'chapter0.txt', metadataFile: 'chapter0_meta.json' },
             { textFile: 'chapter1.txt', metadataFile: 'chapter1_meta.json' },
@@ -42,17 +53,6 @@
             { textFile: 'chapter6.txt', metadataFile: 'chapter6_meta.json' },
             { textFile: 'chapter7.txt', metadataFile: 'chapter7_meta.json' },
         ];
-
-        function text(line, str, x, y, opt, doc, chr, dim) {
-            if (chr > 99) chr = 0;
-            lines = line % 80;
-            if (line && lines === 0 && chr === 0 && !newPage) {
-                doc.addPage("p", "pt", dim);
-                newPage = true;
-            } else if (lines) newPage = false;
-            doc.text('\n'.repeat(lines) + ' '.repeat(chr) + str, x, y, opt);
-            return chr + str.length;
-        }
 
         async function fetchJSON(filePath) {
             const response = await fetch(filePath);
@@ -82,8 +82,23 @@
             });
         }
 
+        function text(line, str, x, y, opt, doc, chr, dim) {
+            if (chr > 99) chr = 0;
+            lines = line % 80;
+            if (line && lines === 0 && chr === 0 && !newPage) {
+                doc.addPage("p", "pt", dim);
+                newPage = true;
+            } else if (lines) newPage = false;
+            doc.text('\n'.repeat(lines) + ' '.repeat(chr) + str, x, y, opt);
+            return chr + str.length;
+        }
+
         async function generatePDF(chapterIndex) {
             try {
+                // Show loading status
+                document.getElementById('status').innerText = `Generating PDF for Chapter ${chapterIndex}...`;
+                document.getElementById('download-link').innerText = '';  // Clear any existing download link
+
                 const { jsPDF } = window.jspdf;
                 const chapter = chapters[chapterIndex];
                 
@@ -123,12 +138,13 @@
 
                 // Show download option
                 const pdfBlob = doc.output('blob');
-                const downloadLink = document.createElement('a');
+                const downloadLink = document.getElementById('download-link');
                 downloadLink.href = URL.createObjectURL(pdfBlob);
                 downloadLink.download = `chapter_${chapterIndex}.pdf`;
                 downloadLink.textContent = `Download Chapter ${chapterIndex}`;
-                document.body.appendChild(downloadLink);
+                downloadLink.style.display = 'block';  // Ensure the download link is visible
                 
+                // Update status
                 document.getElementById('status').innerText = `PDF for Chapter ${chapterIndex} generated successfully!`;
             } catch (error) {
                 document.getElementById('status').innerText = `Error: ${error.message}`;
