@@ -8,7 +8,8 @@
 </head>
 <body>
 
-    <button id="generate-pdf">Generate PDF</button>
+    <h1>Select a Chapter to Generate PDF</h1>
+    <div id="chapter-buttons"></div>
 
     <script>
         const { jsPDF } = window.jspdf;
@@ -68,7 +69,7 @@
             }
         }
 
-        async function createPdf(chapters, coverImage) {
+        async function createPdf(chapter, coverImage) {
             const jspdf = new jsPDF("p", "pt", [904, 1280]); // Set page size
             
             // Load the cover image once
@@ -79,50 +80,46 @@
             img.onload = async function () {
                 const dim = [img.width, img.height];
                 
-                for (let chapter of chapters) {
-                    try {
-                        const textData = await fetchTextFile(chapter.text);
-                        const metadata = await fetchJsonFile(chapter.metadata);
-                        const colorConfig = await fetchJsonFile('/Eternum.json'); // Common JSON for color config
-                        
-                        // Add cover image for each chapter
-                        jspdf.addImage(img, 'PNG', 1, 2, dim[0], dim[1]);
-                        jspdf.addPage("p", "pt", [904, 1280]); // Add a new page for text
-                        jspdf.setFont("Courier");
-                        jspdf.setFontSize(13);
-                        const margin = { top: 30, right: 30, bottom: 30, left: 30 };
-                        const layout = { align: "left", maxWidth: 900 };
-                        let line = 0, chr = 0;
+                try {
+                    const textData = await fetchTextFile(chapter.text);
+                    const metadata = await fetchJsonFile(chapter.metadata);
+                    const colorConfig = await fetchJsonFile('/Eternum.json'); // Common JSON for color config
+                    
+                    // Add cover image for the chapter
+                    jspdf.addImage(img, 'PNG', 1, 2, dim[0], dim[1]);
+                    jspdf.addPage("p", "pt", [904, 1280]); // Add a new page for text
+                    jspdf.setFont("Courier");
+                    jspdf.setFontSize(13);
+                    const margin = { top: 30, right: 30, bottom: 30, left: 30 };
+                    const layout = { align: "left", maxWidth: 900 };
+                    let line = 0, chr = 0;
 
-                        for (let i = 0; i < textData.length; i += 100, line++) {
-                            const lineno = line.toString();
-                            if (lineno in metadata) {
-                                const [u, n] = metadata[lineno];
-                                const color = colorConfig[u];
-                                jspdf.setTextColor(color !== '#FFFFFF' ? color : '#CCCCCC');
-                                chr = text(line, textData.slice(i, i + n), margin.left, margin.top, layout, jspdf, chr, dim);
-                                jspdf.setTextColor(0, 0, 0);
-                                chr = text(line, textData.slice(i + n, i + 100), margin.left, margin.top, layout, jspdf, chr, dim);
-                            } else {
-                                chr = text(line, textData.slice(i, i + 100), margin.left, margin.top, layout, jspdf, chr, dim);
-                            }
+                    for (let i = 0; i < textData.length; i += 100, line++) {
+                        const lineno = line.toString();
+                        if (lineno in metadata) {
+                            const [u, n] = metadata[lineno];
+                            const color = colorConfig[u];
+                            jspdf.setTextColor(color !== '#FFFFFF' ? color : '#CCCCCC');
+                            chr = text(line, textData.slice(i, i + n), margin.left, margin.top, layout, jspdf, chr, dim);
+                            jspdf.setTextColor(0, 0, 0);
+                            chr = text(line, textData.slice(i + n, i + 100), margin.left, margin.top, layout, jspdf, chr, dim);
+                        } else {
+                            chr = text(line, textData.slice(i, i + 100), margin.left, margin.top, layout, jspdf, chr, dim);
                         }
-                        addFooters(jspdf);
-                        
-                        // Open the PDF in a new window after the last chapter
-                        if (chapter === chapters[chapters.length - 1]) {
-                            const pdfOutput = jspdf.output('bloburl');
-                            window.open(pdfOutput); // Open PDF in new window
-                        }
-                    } catch (error) {
-                        console.error('Error creating PDF:', error);
                     }
+                    addFooters(jspdf);
+                    
+                    // Open the PDF in a new window
+                    const pdfOutput = jspdf.output('bloburl');
+                    window.open(pdfOutput); // Open PDF in new window
+                } catch (error) {
+                    console.error('Error creating PDF:', error);
                 }
             };
         }
 
-        // Event listener for the button
-        document.getElementById('generate-pdf').addEventListener('click', function() {
+        // Function to create chapter buttons
+        function createChapterButtons() {
             const chapters = [
                 {
                     text: '/chapter1.txt',
@@ -155,8 +152,18 @@
             ];
 
             const coverImage = '/cover_image.png';
-            createPdf(chapters, coverImage);
-        });
+            const buttonsContainer = document.getElementById('chapter-buttons');
+
+            chapters.forEach((chapter, index) => {
+                const button = document.createElement('button');
+                button.textContent = `Generate PDF for Chapter ${index + 1}`;
+                button.addEventListener('click', () => createPdf(chapter, coverImage));
+                buttonsContainer.appendChild(button);
+            });
+        }
+
+        // Initialize chapter buttons on page load
+        window.onload = createChapterButtons;
     </script>
 </body>
 </html>
