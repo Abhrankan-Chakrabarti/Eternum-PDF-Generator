@@ -142,6 +142,10 @@
         function createChapterButtons() {
             const chapters = [
                 {
+                    text: '/chapter0.txt',
+                    metadata: '/chapter0_metadata.json',
+                },
+                {
                     text: '/chapter1.txt',
                     metadata: '/chapter1_metadata.json',
                 },
@@ -176,7 +180,7 @@
 
             chapters.forEach((chapter, index) => {
                 const button = document.createElement('button');
-                button.textContent = `Generate PDF for Chapter ${index + 1}`;
+                button.textContent = `Generate PDF for Chapter ${index}`;
                 button.addEventListener('click', () => createPdf(chapter, coverImage));
                 buttonsContainer.appendChild(button);
             });
