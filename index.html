@@ -83,7 +83,7 @@
                     try {
                         const textData = await fetchTextFile(chapter.text);
                         const metadata = await fetchJsonFile(chapter.metadata);
-                        const colorConfig = await fetchJsonFile('./Eternum/Eternum.json'); // Common JSON for color config
+                        const colorConfig = await fetchJsonFile('/Eternum.json'); // Common JSON for color config
                         
                         // Add cover image for each chapter
                         jspdf.addImage(img, 'PNG', 1, 2, dim[0], dim[1]);
