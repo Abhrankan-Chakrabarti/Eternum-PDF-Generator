@@ -109,9 +109,10 @@
                         }
                         addFooters(jspdf);
                         
-                        // Save the PDF after the last chapter is processed
+                        // Open the PDF in a new window after the last chapter
                         if (chapter === chapters[chapters.length - 1]) {
-                            jspdf.save('output.pdf'); // Save the final PDF
+                            const pdfOutput = jspdf.output('bloburl');
+                            window.open(pdfOutput); // Open PDF in new window
                         }
                     } catch (error) {
                         console.error('Error creating PDF:', error);
