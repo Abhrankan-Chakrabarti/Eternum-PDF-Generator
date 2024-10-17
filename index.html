@@ -7,148 +7,145 @@
     <style>
         button {
             margin: 10px; /* Add spacing between buttons */
-            padding: 10px 20px;
+            padding: 10px;
             font-size: 16px;
-            cursor: pointer;
         }
-        #status {
+        #loading {
+            display: none;
             margin-top: 20px;
-            font-size: 16px;
+            font-size: 18px;
             color: blue;
         }
-        #download-link {
+        #download-links {
             margin-top: 20px;
+        }
+        #download-links a {
             display: block;
-            font-size: 16px;
-            color: green;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
-    <h1>Eternum PDF Generator</h1>
-    <p>Select a chapter to generate the PDF:</p>
-    <div id="buttons-container">
-        <button onclick="generatePDF(0)">Chapter 0</button>
-        <button onclick="generatePDF(1)">Chapter 1</button>
-        <button onclick="generatePDF(2)">Chapter 2</button>
-        <button onclick="generatePDF(3)">Chapter 3</button>
-        <button onclick="generatePDF(4)">Chapter 4</button>
-        <button onclick="generatePDF(5)">Chapter 5</button>
-        <button onclick="generatePDF(6)">Chapter 6</button>
-        <button onclick="generatePDF(7)">Chapter 7</button>
-    </div>
-    <p id="status"></p>
-    <a id="download-link"></a>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <h1>Select a Chapter to Generate PDF</h1>
+    <button onclick="generatePDF(0)">Generate Chapter 0 PDF</button>
+    <button onclick="generatePDF(1)">Generate Chapter 1 PDF</button>
+    <button onclick="generatePDF(2)">Generate Chapter 2 PDF</button>
+    <button onclick="generatePDF(3)">Generate Chapter 3 PDF</button>
+    <button onclick="generatePDF(4)">Generate Chapter 4 PDF</button>
+    <button onclick="generatePDF(5)">Generate Chapter 5 PDF</button>
+    <button onclick="generatePDF(6)">Generate Chapter 6 PDF</button>
+    <button onclick="generatePDF(7)">Generate Chapter 7 PDF</button>
+
+    <div id="loading">Generating PDF, please wait...</div>
+    <div id="download-links"></div>
+
+    <script src="jspdf.umd.min.js"></script>
     <script>
-        const coverImagePath = 'cover_image.png';
-
-        const chapters = [
-            { textFile: 'chapter0.txt', metadataFile: 'chapter0_meta.json' },
-            { textFile: 'chapter1.txt', metadataFile: 'chapter1_meta.json' },
-            { textFile: 'chapter2.txt', metadataFile: 'chapter2_meta.json' },
-            { textFile: 'chapter3.txt', metadataFile: 'chapter3_meta.json' },
-            { textFile: 'chapter4.txt', metadataFile: 'chapter4_meta.json' },
-            { textFile: 'chapter5.txt', metadataFile: 'chapter5_meta.json' },
-            { textFile: 'chapter6.txt', metadataFile: 'chapter6_meta.json' },
-            { textFile: 'chapter7.txt', metadataFile: 'chapter7_meta.json' },
-        ];
-
-        async function fetchJSON(filePath) {
-            const response = await fetch(filePath);
-            if (!response.ok) throw new Error(`Failed to load ${filePath}`);
-            return response.json();
+        async function fetchResource(file) {
+            const response = await fetch(file);
+            if (!response.ok) throw new Error(`Failed to fetch ${file}`);
+            return await response.text();
         }
 
-        async function fetchText(filePath) {
-            const response = await fetch(filePath);
-            if (!response.ok) throw new Error(`Failed to load ${filePath}`);
-            return response.text();
-        }
+        async function generatePDF(chapter) {
+            const { jsPDF } = window.jspdf;
+            const chapterFile = `chapters/chapter${chapter}.txt`;
+            const metadataFile = `chapters/metadata${chapter}.json`;
+            const coverImageFile = 'chapters/cover_image.png';
 
-        async function fetchCoverImage(imgPath) {
-            return new Promise((resolve, reject) => {
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const textContent = await fetchResource(chapterFile);
+                const metadataContent = await fetchResource(metadataFile);
+                const metadata = JSON.parse(metadataContent);
+                const colorData = await fetchResource('eternum.json');
+                const colorMap = JSON.parse(colorData);
+
                 const img = new Image();
-                img.src = imgPath;
+                img.src = coverImageFile;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    resolve(canvas.toDataURL('image/png'));
+                    const doc = new jsPDF('p', 'pt', [904, 1280]);
+                    doc.addImage(img, 'PNG', 0, 0, 904, 1280);
+                    doc.addPage('p', 'pt', [904, 1280]);
+                    doc.setFont('Courier');
+                    doc.setFontSize(13);
+
+                    const margin = { top: 30, right: 30, bottom: 30, left: 30 };
+                    const layout = { align: 'left', maxWidth: 900 };
+                    let chr = 0;
+                    let line = 0;
+
+                    for (let i = 0; i < textContent.length; i += 100, line++) {
+                        const lineNumber = line.toString();
+                        if (lineNumber in metadata) {
+                            const user = metadata[lineNumber][0];
+                            const numChars = metadata[lineNumber][1];
+                            const color = colorMap[user];
+                            doc.setTextColor(color !== '#FFFFFF' ? color : '#CCCCCC');
+                            chr = addText(line, textContent.slice(i, i + numChars), margin.left, margin.top, layout, doc, chr, [904, 1280]);
+                            doc.setTextColor(0, 0, 0);
+                            chr = addText(line, textContent.slice(i + numChars, i + 100), margin.left, margin.top, layout, doc, chr, [904, 1280]);
+                        } else {
+                            chr = addText(line, textContent.slice(i, i + 100), margin.left, margin.top, layout, doc, chr, [904, 1280]);
+                        }
+                    }
+
+                    // Add footers
+                    addFooters(doc);
+
+                    // Show download link with a meaningful name
+                    const fileName = `Chapter_${chapter}.pdf`; // Descriptive file name
+                    const pdfData = doc.output('bloburl');
+                    const link = document.createElement('a');
+                    link.href = pdfData;
+                    link.download = fileName; // Set the filename here
+                    link.textContent = `Download ${fileName}`;
+                    document.getElementById('download-links').appendChild(link);
+
+                    document.getElementById('loading').style.display = 'none';
                 };
-                img.onerror = () => reject(new Error('Failed to load image.'));
-            });
+
+            } catch (error) {
+                console.error('Error:', error.message);
+                document.getElementById('loading').style.display = 'none';
+            }
         }
 
-        function text(line, str, x, y, opt, doc, chr, dim) {
+        // Function to add footers to all pages
+        function addFooters(doc) {
+            const pageCount = doc.getNumberOfPages();
+            doc.setFontSize(15); // Larger font size for clarity
+
+            for (let i = 2; i <= pageCount; i++) {
+                doc.setPage(i);
+
+                // Get current page width and height
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+
+                // Calculate X and Y coordinates for the footer text
+                const x = pageWidth / 2;  // Center the text horizontally
+                const y = pageHeight - 20; // 20 units from the bottom
+
+                // Add the footer text, center-aligned
+                doc.text(`Page ${i} of ${pageCount}`, x, y, { align: 'center' });
+            }
+        }
+
+        // The unchanged addText function
+        function addText(line, str, x, y, opt, doc, chr, dim) {
             if (chr > 99) chr = 0;
-            lines = line % 80;
+            const lines = line % 80;
+            let newPage = false;
             if (line && lines === 0 && chr === 0 && !newPage) {
                 doc.addPage("p", "pt", dim);
                 newPage = true;
-            } else if (lines) newPage = false;
+            } else if (lines) {
+                newPage = false;
+            }
             doc.text('\n'.repeat(lines) + ' '.repeat(chr) + str, x, y, opt);
             return chr + str.length;
-        }
-
-        async function generatePDF(chapterIndex) {
-            try {
-                // Show loading status
-                document.getElementById('status').innerText = `Generating PDF for Chapter ${chapterIndex}...`;
-                document.getElementById('download-link').innerText = '';  // Clear any existing download link
-
-                const { jsPDF } = window.jspdf;
-                const chapter = chapters[chapterIndex];
-                
-                // Fetch text and metadata
-                const chapterText = await fetchText(chapter.textFile);
-                const metadata = await fetchJSON(chapter.metadataFile);
-                const colors = await fetchJSON('Eternum.json'); // Fetch Eternum.json once
-
-                // Fetch and add the cover image
-                const coverImageData = await fetchCoverImage(coverImagePath);
-                const doc = new jsPDF("p", "pt", [904, 1280]);
-                doc.addImage(coverImageData, 'PNG', 1, 2, 904, 1280);
-
-                // Add new page for content
-                doc.addPage("p", "pt", [904, 1280]);
-                doc.setFont("Courier");
-                doc.setFontSize(13);
-                const margin = { top: 30, right: 30, bottom: 30, left: 30 };
-                const layout = { align: "left", maxWidth: 900 };
-
-                let line = 0;
-                let chr = 0;
-                
-                for (let i = 0; i < chapterText.length; i += 100, line++) {
-                    const lineno = line.toString();
-                    if (metadata[lineno]) {
-                        const [user, n] = metadata[lineno];
-                        const color = colors[user];
-                        doc.setTextColor(color !== '#FFFFFF' ? color : '#CCCCCC');
-                        chr = text(line, chapterText.slice(i, i + n), margin.left, margin.top, layout, doc, chr, [904, 1280]);
-                        doc.setTextColor(0, 0, 0);
-                        chr = text(line, chapterText.slice(i + n, i + 100), margin.left, margin.top, layout, doc, chr, [904, 1280]);
-                    } else {
-                        chr = text(line, chapterText.slice(i, i + 100), margin.left, margin.top, layout, doc, chr, [904, 1280]);
-                    }
-                }
-
-                // Show download option
-                const pdfBlob = doc.output('blob');
-                const downloadLink = document.getElementById('download-link');
-                downloadLink.href = URL.createObjectURL(pdfBlob);
-                downloadLink.download = `chapter_${chapterIndex}.pdf`;
-                downloadLink.textContent = `Download Chapter ${chapterIndex}`;
-                downloadLink.style.display = 'block';  // Ensure the download link is visible
-                
-                // Update status
-                document.getElementById('status').innerText = `PDF for Chapter ${chapterIndex} generated successfully!`;
-            } catch (error) {
-                document.getElementById('status').innerText = `Error: ${error.message}`;
-            }
         }
     </script>
 </body>
