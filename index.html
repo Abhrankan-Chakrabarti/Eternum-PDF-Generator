@@ -62,6 +62,8 @@
                 const colorData = await fetchResource('eternum.json');
                 const colorMap = JSON.parse(colorData);
 
+                const textContent = await fetchResource(chapterFile);
+                const m
                 const img = new Image();
                 img.src = coverImageFile;
                 img.onload = () => {
